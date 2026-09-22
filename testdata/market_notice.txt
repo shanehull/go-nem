@@ -1,0 +1,31 @@
+-------------------------------------------------------------------
+                           MARKET NOTICE
+-------------------------------------------------------------------
+
+From :              AEMO
+To   :              NEMITWEB1
+Creation Date :     26/08/2026     11:18:33
+
+-------------------------------------------------------------------
+
+Notice ID               :         144924
+Notice Type ID          :         MINIMUM SYSTEM LOAD
+Notice Type Description :         MSL1/MSL2/MSL3
+Issue Date              :         26/08/2026
+External Reference      :         Forecast Minimum System Load MSL1 condition in the SA Region on 30/08/2026
+
+-------------------------------------------------------------------
+
+Reason :
+
+AEMO ELECTRICITY MARKET NOTICE
+
+Update to Market Notice 144917 - AEMO has detected that there is an elevated risk of insufficient demand to maintain a secure operating state in the SA region on 30/08/2026.
+
+This notice supersedes Market Notice 144808 published on 18 August 2026.
+
+AEMO Operations
+
+-------------------------------------------------------------------
+END OF REPORT
+-------------------------------------------------------------------
