@@ -13,43 +13,72 @@ import (
 
 var zipMagic = []byte{'P', 'K', 0x03, 0x04}
 
-// Parse decodes a nested record report into its tables. It accepts either a
-// zip archive containing one CSV or raw nested CSV bytes.
+// maxZipDepth bounds how many nested zip layers Parse unwraps. AEMO archives
+// some reports double-zipped, and a corrupt file should not loop forever.
+const maxZipDepth = 4
+
+// errNoTables reports a stream carrying no nested-record tables, so a zip with
+// non-report entries can skip them.
+var errNoTables = errors.New("nem: no tables found")
+
+// Parse decodes a nested record report into its tables. It accepts raw nested
+// CSV bytes or a zip archive, unwrapping nested zips and every entry of a
+// multi-entry archive. AEMO publishes daily dispatch reports as one outer zip
+// containing one inner zip per interval.
 func Parse(data []byte) ([]Table, error) {
-	if bytes.HasPrefix(data, zipMagic) {
-		raw, err := firstZipEntry(data)
-		if err != nil {
-			return nil, err
-		}
-		data = raw
-	}
-	return parseNested(data)
+	return parse(data, 0)
 }
 
-func firstZipEntry(data []byte) ([]byte, error) {
+func parse(data []byte, depth int) ([]Table, error) {
+	if !bytes.HasPrefix(data, zipMagic) {
+		return parseNested(data)
+	}
+	if depth >= maxZipDepth {
+		return nil, errors.New("nem: too many nested zip layers")
+	}
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("nem: open zip: %w", err)
 	}
+
+	var all []Table
 	for _, f := range zr.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
-		rc, err := f.Open()
+		body, err := readZipEntry(f)
 		if err != nil {
-			return nil, fmt.Errorf("nem: open zip entry %q: %w", f.Name, err)
+			return nil, err
 		}
-		body, readErr := io.ReadAll(rc)
-		closeErr := rc.Close()
-		if readErr != nil {
-			return nil, fmt.Errorf("nem: read zip entry %q: %w", f.Name, readErr)
+		tables, err := parse(body, depth+1)
+		if errors.Is(err, errNoTables) {
+			continue
 		}
-		if closeErr != nil {
-			return nil, fmt.Errorf("nem: close zip entry %q: %w", f.Name, closeErr)
+		if err != nil {
+			return nil, fmt.Errorf("nem: parse zip entry %q: %w", f.Name, err)
 		}
-		return body, nil
+		all = append(all, tables...)
 	}
-	return nil, errors.New("nem: zip archive is empty")
+	if len(all) == 0 {
+		return nil, errNoTables
+	}
+	return all, nil
+}
+
+func readZipEntry(f *zip.File) ([]byte, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return nil, fmt.Errorf("nem: open zip entry %q: %w", f.Name, err)
+	}
+	body, readErr := io.ReadAll(rc)
+	closeErr := rc.Close()
+	if readErr != nil {
+		return nil, fmt.Errorf("nem: read zip entry %q: %w", f.Name, readErr)
+	}
+	if closeErr != nil {
+		return nil, fmt.Errorf("nem: close zip entry %q: %w", f.Name, closeErr)
+	}
+	return body, nil
 }
 
 func parseNested(data []byte) ([]Table, error) {
@@ -104,16 +133,25 @@ func parseNested(data []byte) ([]Table, error) {
 			}
 			tables[i].Rows = append(tables[i].Rows, rec[4:])
 		default:
-			return nil, fmt.Errorf("nem: unknown record type %q", rec[0])
+			return nil, fmt.Errorf("nem: unknown record type %q", clip(rec[0], 32))
 		}
 	}
 
 	if len(tables) == 0 {
-		return nil, errors.New("nem: no tables found")
+		return nil, errNoTables
 	}
 	return tables, nil
 }
 
 func tableKey(group, name string, version int) string {
 	return group + "\x00" + name + "\x00" + strconv.Itoa(version)
+}
+
+// clip shortens a value for an error message so a binary blob does not produce
+// a multi-kilobyte error line.
+func clip(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }

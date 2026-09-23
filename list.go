@@ -28,7 +28,9 @@ func (c *Client) List(ctx context.Context, report Report, opts ...ListOption) ([
 		opt(p)
 	}
 
-	dirURL := c.baseURL + "/Reports/" + p.tier.String() + "/" + report.Dir + "/"
+	// No trailing slash: NEMWEB's host answers ".../<Report>/" with
+	// "Website is unavailable", while ".../<Report>" returns the listing.
+	dirURL := c.baseURL + "/Reports/" + p.tier.String() + "/" + report.Dir
 	body, err := internal.Get(ctx, c.httpClient, dirURL, c.userAgent)
 	if err != nil {
 		return nil, err
@@ -72,6 +74,9 @@ func parseListing(body string, report Report, tier Tier, baseURL string) []FileR
 func filterRefs(refs []FileRef, p *listParams) []FileRef {
 	out := make([]FileRef, 0, len(refs))
 	for _, r := range refs {
+		if p.nameStamp != "" && !strings.Contains(r.Name, p.nameStamp) {
+			continue
+		}
 		if !r.Modified.IsZero() {
 			if !p.since.IsZero() && r.Modified.Before(p.since) {
 				continue

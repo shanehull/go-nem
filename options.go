@@ -3,10 +3,11 @@ package nem
 import "time"
 
 type listParams struct {
-	since time.Time
-	until time.Time
-	limit int
-	tier  Tier
+	since     time.Time
+	until     time.Time
+	limit     int
+	tier      Tier
+	nameStamp string
 }
 
 // ListOption configures a List call.
@@ -34,6 +35,14 @@ func On(day time.Time) ListOption {
 // Limit caps the number of files returned, keeping the newest.
 func Limit(n int) ListOption {
 	return func(p *listParams) { p.limit = n }
+}
+
+// OnName filters to files whose name contains the day as YYYYMMDD. Archive
+// files are named by their data date, which can differ from the listing
+// modification time, so this is the correct filter when backfilling a day.
+func OnName(day time.Time) ListOption {
+	stamp := day.Format("20060102")
+	return func(p *listParams) { p.nameStamp = stamp }
 }
 
 // FromArchive lists the archive tier instead of the current tier.

@@ -3,9 +3,11 @@ package nem_test
 import (
 	"archive/zip"
 	"bytes"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -47,6 +49,26 @@ func zipBytes(t *testing.T, name string, content []byte) []byte {
 	return buf.Bytes()
 }
 
+// zipMulti builds a zip containing every given entry, in a deterministic order.
+func zipMulti(t *testing.T, entries map[string][]byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, name := range slices.Sorted(maps.Keys(entries)) {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("create zip entry %s: %v", name, err)
+		}
+		if _, err := w.Write(entries[name]); err != nil {
+			t.Fatalf("write zip entry %s: %v", name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close zip: %v", err)
+	}
+	return buf.Bytes()
+}
+
 // newServer serves a report directory listing and the file body for any file
 // under it. It returns the request count for file downloads.
 func newServer(t *testing.T, dir string, listing, file []byte) (*httptest.Server, *int32) {
@@ -54,7 +76,7 @@ func newServer(t *testing.T, dir string, listing, file []byte) (*httptest.Server
 	var hits int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == dir:
+		case strings.TrimSuffix(r.URL.Path, "/") == strings.TrimSuffix(dir, "/"):
 			_, _ = w.Write(listing)
 		case strings.HasPrefix(r.URL.Path, dir):
 			atomic.AddInt32(&hits, 1)

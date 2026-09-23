@@ -46,6 +46,46 @@ func TestParseZip(t *testing.T) {
 	}
 }
 
+func TestParseDoubleZip(t *testing.T) {
+	// AEMO publishes some daily archives double-zipped: an outer zip whose
+	// single entry is the report zip.
+	inner := zipBytes(t, "PUBLIC_DISPATCHIS_202608220005_0000000533804272.CSV", readFixture(t, "dispatchis.csv"))
+	outer := zipBytes(t, "PUBLIC_DISPATCHIS_20260822.zip", inner)
+
+	tables, err := nem.Parse(outer)
+	if err != nil {
+		t.Fatalf("Parse double zip: %v", err)
+	}
+	if len(tables) != 3 {
+		t.Fatalf("got %d tables, want 3", len(tables))
+	}
+}
+
+func TestParseMultiEntryZip(t *testing.T) {
+	// A daily archive is an outer zip of one inner zip per interval. Every
+	// entry must contribute rows, not just the first.
+	inner := zipBytes(t, "PUBLIC_DISPATCHIS_202608220005_0000000533804272.CSV", readFixture(t, "dispatchis.csv"))
+	outer := zipMulti(t, map[string][]byte{
+		"PUBLIC_DISPATCHIS_202608220005_0000000533804272.zip": inner,
+		"PUBLIC_DISPATCHIS_202608220010_0000000533804879.zip": inner,
+	})
+
+	tables, err := nem.Parse(outer)
+	if err != nil {
+		t.Fatalf("Parse multi-entry zip: %v", err)
+	}
+	if len(tables) != 6 {
+		t.Fatalf("got %d tables, want 6", len(tables))
+	}
+	prices, err := nem.DecodeDispatchPrice(tables)
+	if err != nil {
+		t.Fatalf("DecodeDispatchPrice: %v", err)
+	}
+	if len(prices) != 4 {
+		t.Fatalf("got %d prices, want 4", len(prices))
+	}
+}
+
 func TestParseUnknownRecordType(t *testing.T) {
 	if _, err := nem.Parse([]byte("X,foo,bar\n")); err == nil {
 		t.Fatal("expected error for unknown record type")

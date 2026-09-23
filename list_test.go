@@ -53,6 +53,29 @@ func TestListLimit(t *testing.T) {
 	}
 }
 
+func TestListOnName(t *testing.T) {
+	srv, _ := newServer(t, dispatchISDir, readFixture(t, "listing.html"), nil)
+	client, _ := nem.New(nem.WithBaseURL(srv.URL))
+
+	match, err := client.List(context.Background(), nem.ReportDispatchIS,
+		nem.OnName(mustTime(t, "2026-09-21T00:00:00+10:00")))
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(match) != 3 {
+		t.Fatalf("got %d refs, want 3", len(match))
+	}
+
+	none, err := client.List(context.Background(), nem.ReportDispatchIS,
+		nem.OnName(mustTime(t, "2026-09-22T00:00:00+10:00")))
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(none) != 0 {
+		t.Fatalf("got %d refs, want 0", len(none))
+	}
+}
+
 func TestListSince(t *testing.T) {
 	srv, _ := newServer(t, dispatchISDir, readFixture(t, "listing.html"), nil)
 	client, _ := nem.New(nem.WithBaseURL(srv.URL))
