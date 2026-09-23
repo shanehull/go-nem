@@ -55,7 +55,7 @@ Dispatch and MMS reports are zip archives containing one CSV. Market notices are
 
 ### Directory listings
 
-NEMWEB serves Apache autoindex HTML. `List` matches anchors by the report's file prefix, so the `Ancillary_Services_Payments` report (which does not share a `PUBLIC_` prefix) needs its prefix confirmed before it is added.
+NEMWEB serves IIS directory listings, not Apache. The whole listing is one line, `HREF` is uppercase, and the modification time and size precede the anchor (`Monday, September 21, 2026 08:05 AM   20629 <A HREF=...>`). `List` matches anchors by the report's file prefix, so the `Ancillary_Services_Payments` report (which does not share a `PUBLIC_` prefix) needs its prefix confirmed before it is added.
 
 ### Time conventions
 
